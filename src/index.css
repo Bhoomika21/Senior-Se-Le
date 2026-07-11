@@ -1,0 +1,60 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@600;700&display=swap');
+
+@theme {
+  /* Brand colors — matched to logo */
+  --color-navy: #16213E;
+  --color-navy-light: #2A3655;
+  --color-orange: #FF7A1A;
+  --color-orange-dark: #E8650A;
+  --color-cream: #FAFAF8;
+  --color-surface: #FFFFFF;
+  --color-success: #2ECC71;
+  --color-success-bg: #E8FBF2;
+  --color-warning: #F59E0B;
+  --color-warning-bg: #FFF3CD;
+  --color-danger: #FF4757;
+  --color-danger-bg: #FEE2E2;
+  --color-muted: #8A8AA3;
+  --color-border: #ECEAE6;
+
+  /* Fonts */
+  --font-display: 'Poppins', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-devanagari: 'Noto Sans Devanagari', sans-serif;
+
+  /* Radius scale */
+  --radius-card: 1.25rem;
+  --radius-button: 0.875rem;
+  --radius-chip: 999px;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--color-cream);
+  color: var(--color-navy);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-devanagari {
+  font-family: var(--font-devanagari);
+}
+
+html {
+  overflow-x: hidden;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+button{
+  cursor: pointer;
+}
