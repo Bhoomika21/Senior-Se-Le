@@ -1,19 +1,23 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import { useNotifications } from './hooks/useNotifications'
 import Splash from './pages/Splash'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
+import Onboarding from './pages/Onboarding'
 import Home from './pages/Home'
-import PostBook from './pages/PostBook'
-import BookDetail from './pages/BookDetail'
-import Chat from './pages/Chat'
-import Inbox from './pages/Inbox'
-import Profile from './pages/Profile'
-import ReportUser from './pages/ReportUser'
-import BlockUser from './pages/BlockUser'
-import RateUser from './pages/RateUser'
 import BottomNav from './components/BottomNav'
+import InstallPrompt from './components/InstallPrompt'
+
+// Lazy load heavier pages
+const PostBook = lazy(() => import('./pages/PostBook'))
+const BookDetail = lazy(() => import('./pages/BookDetail'))
+const Chat = lazy(() => import('./pages/Chat'))
+const Inbox = lazy(() => import('./pages/Inbox'))
+const Profile = lazy(() => import('./pages/Profile'))
+const ReportUser = lazy(() => import('./pages/ReportUser'))
+const BlockUser = lazy(() => import('./pages/BlockUser'))
+const RateUser = lazy(() => import('./pages/RateUser'))
 
 // Screens that show the bottom nav
 const NAV_SCREENS = ['home', 'inbox', 'profile']
@@ -22,6 +26,9 @@ function AppContent() {
   const { user, loading } = useAuth()
   const { unreadCount, notifications, markAllRead } = useNotifications(user?.id)
   const [showSplash, setShowSplash] = useState(true)
+  const [showOnboarding, setShowOnboarding] = useState(
+    !localStorage.getItem('ssl_onboarded')
+  )
   const [authView, setAuthView] = useState('login')
   const [screen, setScreen] = useState('home')
   const [previousScreen, setPreviousScreen] = useState('home')
@@ -38,6 +45,16 @@ function AppContent() {
   }, [])
 
   if (showSplash || loading) return <Splash />
+
+  // First time visitor — show onboarding
+  if (showOnboarding && !user) {
+    return (
+      <Onboarding onDone={() => {
+        localStorage.setItem('ssl_onboarded', 'true')
+        setShowOnboarding(false)
+      }} />
+    )
+  }
 
   if (!user) {
     return authView === 'login' ? (
@@ -205,11 +222,14 @@ function AppContent() {
 
       {/* Bottom nav — only on main screens */}
       {NAV_SCREENS.includes(screen) && (
-        <BottomNav
-          active={navTab}
-          onNavigate={handleNavigation}
-          unreadCount={unreadCount}
-        />
+        <>
+          <BottomNav
+            active={navTab}
+            onNavigate={handleNavigation}
+            unreadCount={unreadCount}
+          />
+          <InstallPrompt />
+        </>
       )}
     </div>
   )
@@ -218,7 +238,9 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <Suspense fallback={<Splash />}>
+        <AppContent />
+      </Suspense>
     </AuthProvider>
   )
 }

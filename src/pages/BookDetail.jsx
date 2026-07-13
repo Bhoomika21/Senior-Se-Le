@@ -24,6 +24,12 @@ export default function BookDetail({ book, onBack, onChat, onReport, onEdit, onR
     if (!error) onRemoved?.()
   }
 
+  function handleShare() {
+    const text = `📚 *${book.title}* for ₹${book.price}\nCondition: ${['', 'Heavily Used', 'Worn', 'Fair', 'Good', 'Like New'][book.condition]}\n\nCheck it out on Senior Se Le 👇\nhttps://senior-se-le-one.vercel.app`
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`
+    window.open(whatsappUrl, '_blank')
+  }
+
   return (
     <div className="min-h-screen bg-cream pb-28">
       {/* Header */}
@@ -34,11 +40,16 @@ export default function BookDetail({ book, onBack, onChat, onReport, onEdit, onR
           </button>
           <h1 className="font-display font-bold text-white text-base">Book Details</h1>
         </div>
-        {!isOwner && (
-          <button onClick={() => onReport?.(book)} className="text-white/70">
-            <Flag size={18} />
+        <div className="flex items-center gap-2">
+          <button onClick={handleShare} className="text-white/70">
+            <Share2 size={18} />
           </button>
-        )}
+          {!isOwner && (
+            <button onClick={() => onReport?.(book)} className="text-white/70">
+              <Flag size={18} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Media gallery */}
