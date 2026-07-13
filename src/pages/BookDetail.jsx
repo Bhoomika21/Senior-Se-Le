@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronLeft, ShieldCheck, Flag, MessageCircle, Trash2, Edit2, Star } from 'lucide-react'
+import { ChevronLeft, ShieldCheck, Flag, MessageCircle, Trash2, Edit2, Star, Share2 } from 'lucide-react'
 import Button from '../components/Button'
 import ConditionBadge from '../components/ConditionBadge'
 import { supabase } from '../lib/supabase'
