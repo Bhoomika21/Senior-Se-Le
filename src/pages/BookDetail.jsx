@@ -25,7 +25,7 @@ export default function BookDetail({ book, onBack, onChat, onReport, onEdit, onR
   }
 
   function handleShare() {
-    const text = `📚 *${book.title}* for ₹${book.price}\nCondition: ${['', 'Heavily Used', 'Worn', 'Fair', 'Good', 'Like New'][book.condition]}\n\nCheck it out on Senior Se Le 👇\nhttps://senior-se-le-one.vercel.app`
+    const text = `📚 *${book.title}* for ₹${book.price}\nCondition: ${['', 'Heavily Used', 'Worn', 'Fair', 'Good', 'Like New'][book.condition]}\n\nCheck it out on Senior Se Le 👇\nhttps://seniorsele.com`
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`
     window.open(whatsappUrl, '_blank')
   }
