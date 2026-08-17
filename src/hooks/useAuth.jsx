@@ -13,51 +13,49 @@ export function AuthProvider({ children }) {
       setUser(session?.user ?? null)
       setLoading(false)
     })
-
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
     })
-
     return () => listener.subscription.unsubscribe()
   }, [])
 
   useEffect(() => {
-    if (!user) {
-      setProfile(null)
-      return
-    }
-    supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-      .then(({ data, error }) => {
-        if (!error) setProfile(data)
-      })
+    if (!user) { setProfile(null); return }
+    supabase.from('profiles').select('*').eq('id', user.id).single()
+      .then(({ data, error }) => { if (!error) setProfile(data) })
   }, [user])
 
-  async function signUp({ email, password, fullName, college }) {
+  async function signUp({ email, password, fullName, college, city, lat, lng }) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { full_name: fullName, college },
+        data: { full_name: fullName, college, city, lat, lng },
       },
     })
     return { data, error }
   }
 
   async function signIn({ email, password }) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    return supabase.auth.signInWithPassword({ email, password })
+  }
+
+  async function signOut() { await supabase.auth.signOut() }
+
+  async function updateProfile(updates) {
+    if (!user) return
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', user.id)
+      .select()
+      .single()
+    if (!error && data) setProfile(data)
     return { data, error }
   }
 
-  async function signOut() {
-    await supabase.auth.signOut()
-  }
-
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, updateProfile }}>
       {children}
     </AuthContext.Provider>
   )

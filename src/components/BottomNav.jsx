@@ -1,9 +1,9 @@
-import { Home, User, MessageCircle, PlusSquare } from 'lucide-react'
+import { Home, User, MessageCircle, BookMarked } from 'lucide-react'
 
 const TABS = [
   { key: 'home', icon: Home, label: 'Home' },
   { key: 'inbox', icon: MessageCircle, label: 'Messages' },
-  { key: 'post', icon: PlusSquare, label: 'Sell' },
+  { key: 'mylistings', icon: BookMarked, label: 'My Books' },
   { key: 'profile', icon: User, label: 'Profile' },
 ]
 

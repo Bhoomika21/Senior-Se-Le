@@ -9,26 +9,23 @@ import Home from './pages/Home'
 import BottomNav from './components/BottomNav'
 import InstallPrompt from './components/InstallPrompt'
 
-// Lazy load heavier pages
 const PostBook = lazy(() => import('./pages/PostBook'))
 const BookDetail = lazy(() => import('./pages/BookDetail'))
 const Chat = lazy(() => import('./pages/Chat'))
 const Inbox = lazy(() => import('./pages/Inbox'))
 const Profile = lazy(() => import('./pages/Profile'))
+const MyListings = lazy(() => import('./pages/MyListings'))
 const ReportUser = lazy(() => import('./pages/ReportUser'))
 const BlockUser = lazy(() => import('./pages/BlockUser'))
 const RateUser = lazy(() => import('./pages/RateUser'))
 
-// Screens that show the bottom nav
-const NAV_SCREENS = ['home', 'inbox', 'profile']
+const NAV_SCREENS = ['home', 'inbox', 'mylistings', 'profile']
 
 function AppContent() {
   const { user, loading } = useAuth()
   const { unreadCount, notifications, markAllRead } = useNotifications(user?.id)
   const [showSplash, setShowSplash] = useState(true)
-  const [showOnboarding, setShowOnboarding] = useState(
-    !localStorage.getItem('ssl_onboarded')
-  )
+  const [showOnboarding, setShowOnboarding] = useState(!localStorage.getItem('ssl_onboarded'))
   const [authView, setAuthView] = useState('login')
   const [screen, setScreen] = useState('home')
   const [previousScreen, setPreviousScreen] = useState('home')
@@ -46,7 +43,6 @@ function AppContent() {
 
   if (showSplash || loading) return <Splash />
 
-  // First time visitor — show onboarding
   if (showOnboarding && !user) {
     return (
       <Onboarding onDone={() => {
@@ -57,192 +53,107 @@ function AppContent() {
   }
 
   if (!user) {
-    return authView === 'login' ? (
-      <Login onSwitchToSignup={() => setAuthView('signup')} />
-    ) : (
-      <Signup onSwitchToLogin={() => setAuthView('login')} />
-    )
+    return authView === 'login'
+      ? <Login onSwitchToSignup={() => setAuthView('signup')} />
+      : <Signup onSwitchToLogin={() => setAuthView('login')} />
   }
 
-  function goTo(next) {
-    setPreviousScreen(screen)
-    setScreen(next)
-  }
+  function goTo(next) { setPreviousScreen(screen); setScreen(next) }
 
   function handleNavigation(key) {
-    if (key === 'post') {
-      goTo('post')
-    } else if (key === 'inbox') {
-      markAllRead()
-      setScreen('inbox')
-    } else {
-      setScreen(key)
-    }
+    if (key === 'post') goTo('post')
+    else setScreen(key)
   }
 
-  function openBook(book) {
-    setSelectedBook(book)
-    goTo('detail')
-  }
+  function openBook(book) { setSelectedBook(book); goTo('detail') }
+  function openChat(book) { setChatBook(book); setChatConversation(null); goTo('chat') }
+  function openConversation(conv) { setChatConversation(conv); setChatBook(conv.book); goTo('chat') }
+  function openReport(profileObj) { setTargetUser(profileObj); goTo('report') }
+  function openBlock(profileObj) { setTargetUser(profileObj); goTo('block') }
+  function openRate(profileObj) { setTargetUser(profileObj); goTo('rate') }
 
-  function openChat(book) {
-    setChatBook(book)
-    setChatConversation(null)
-    goTo('chat')
-  }
-
-  function openConversation(conv) {
-    setChatConversation(conv)
-    setChatBook(conv.book)
-    markAllRead()
-    goTo('chat')
-  }
-
-  function openReport(profileObj) {
-    setTargetUser(profileObj)
-    goTo('report')
-  }
-
-  function openBlock(profileObj) {
-    setTargetUser(profileObj)
-    goTo('block')
-  }
-
-  function openRate(profileObj) {
-    setTargetUser(profileObj)
-    goTo('rate')
-  }
-
-  // Determine the active bottom-nav tab
   const navTab = NAV_SCREENS.includes(screen) ? screen : null
 
   return (
-    <div className="relative">
-      {/* ── SCREENS ── */}
-      {screen === 'post' && (
-        <PostBook
-          onBack={() => setScreen('home')}
-          onPosted={() => setScreen('home')}
-        />
-      )}
+    <Suspense fallback={<Splash />}>
+      <div className="relative">
 
-      {screen === 'edit' && editingBook && (
-        <PostBook
-          editBook={editingBook}
-          onBack={() => setScreen('detail')}
-          onPosted={() => { setEditingBook(null); setScreen('home') }}
-        />
-      )}
-
-      {screen === 'detail' && selectedBook && (
-        <BookDetail
-          book={selectedBook}
-          onBack={() => setScreen('home')}
-          onChat={openChat}
-          onReport={(book) => openReport({ id: book.seller_id, full_name: book.profiles?.full_name })}
-          onEdit={(book) => { setEditingBook(book); setScreen('edit') }}
-          onRemoved={() => setScreen('home')}
-        />
-      )}
-
-      {screen === 'chat' && (chatBook || chatConversation) && (
-        <Chat
-          book={chatBook}
-          existingConversation={chatConversation}
-          onBack={() => {
-            setChatBook(null)
-            setChatConversation(null)
-            setScreen(chatConversation ? 'inbox' : 'detail')
-          }}
-          onReportUser={openReport}
-          onBlockUser={openBlock}
-          onRateUser={openRate}
-          onMarkRead={markAllRead}
-        />
-      )}
-
-      {screen === 'report' && targetUser && (
-        <ReportUser
-          reportedUserId={targetUser.id}
-          reportedUserName={targetUser.full_name}
-          onBack={() => setScreen(previousScreen)}
-          onSubmitted={() => setScreen('home')}
-        />
-      )}
-
-      {screen === 'block' && targetUser && (
-        <BlockUser
-          blockedUserId={targetUser.id}
-          blockedUserName={targetUser.full_name}
-          onBack={() => setScreen(previousScreen)}
-          onBlocked={() => setScreen('home')}
-        />
-      )}
-
-      {screen === 'rate' && targetUser && (
-        <RateUser
-          book={chatBook || selectedBook}
-          ratedUserId={targetUser.id}
-          ratedUserName={targetUser.full_name}
-          onBack={() => setScreen(previousScreen)}
-          onSubmitted={() => setScreen('home')}
-        />
-      )}
-
-      {/* Screens that always render but hide behind others via display */}
-      <div className={screen === 'home' ? 'block' : 'hidden'}>
-        <Home
-          isActive={screen === 'home'}
-          onOpenPost={() => goTo('post')}
-          onOpenBook={openBook}
-          onOpenInbox={() => setScreen('inbox')}
-          unreadCount={unreadCount}
-          notifications={notifications}
-          onMarkRead={markAllRead}
-        />
-      </div>
-
-      <div className={screen === 'inbox' ? 'block' : 'hidden'}>
-        <Inbox
-          isActive={screen === 'inbox'}
-          onBack={() => setScreen('home')}
-          onOpenConversation={openConversation}
-          onMarkRead={markAllRead}
-        />
-      </div>
-
-      <div className={screen === 'profile' ? 'block' : 'hidden'}>
-        <Profile
-          isActive={screen === 'profile'}
-          onBack={() => setScreen('home')}
-          onOpenBook={openBook}
-          onEditBook={(book) => { setEditingBook(book); goTo('edit') }}
-        />
-      </div>
-
-      {/* Bottom nav — only on main screens */}
-      {NAV_SCREENS.includes(screen) && (
-        <>
-          <BottomNav
-            active={navTab}
-            onNavigate={handleNavigation}
-            unreadCount={unreadCount}
+        {screen === 'post' && (
+          <PostBook onBack={() => setScreen('home')} onPosted={() => setScreen('mylistings')} />
+        )}
+        {screen === 'edit' && editingBook && (
+          <PostBook editBook={editingBook} onBack={() => setScreen(previousScreen)} onPosted={() => { setEditingBook(null); setScreen('mylistings') }} />
+        )}
+        {screen === 'detail' && selectedBook && (
+          <BookDetail
+            book={selectedBook}
+            onBack={() => setScreen(previousScreen)}
+            onChat={openChat}
+            onReport={(book) => openReport({ id: book.seller_id, full_name: book.profiles?.full_name })}
+            onEdit={(book) => { setEditingBook(book); goTo('edit') }}
+            onRemoved={() => setScreen('mylistings')}
           />
-          <InstallPrompt />
-        </>
-      )}
-    </div>
+        )}
+        {screen === 'chat' && (chatBook || chatConversation) && (
+          <Chat
+            book={chatBook}
+            existingConversation={chatConversation}
+            onBack={() => { setChatBook(null); setChatConversation(null); setScreen(chatConversation ? 'inbox' : 'detail') }}
+            onReportUser={openReport}
+            onBlockUser={openBlock}
+            onRateUser={openRate}
+            onMarkRead={markAllRead}
+          />
+        )}
+        {screen === 'report' && targetUser && (
+          <ReportUser reportedUserId={targetUser.id} reportedUserName={targetUser.full_name} onBack={() => setScreen(previousScreen)} onSubmitted={() => setScreen('home')} />
+        )}
+        {screen === 'block' && targetUser && (
+          <BlockUser blockedUserId={targetUser.id} blockedUserName={targetUser.full_name} onBack={() => setScreen(previousScreen)} onBlocked={() => setScreen('home')} />
+        )}
+        {screen === 'rate' && targetUser && (
+          <RateUser book={chatBook || selectedBook} ratedUserId={targetUser.id} ratedUserName={targetUser.full_name} onBack={() => setScreen(previousScreen)} onSubmitted={() => setScreen('home')} />
+        )}
+
+        {/* Persistent screens */}
+        <div className={screen === 'home' ? 'block' : 'hidden'}>
+          <Home
+            isActive={screen === 'home'}
+            onOpenPost={() => goTo('post')}
+            onOpenBook={openBook}
+            onOpenInbox={() => setScreen('inbox')}
+            unreadCount={unreadCount}
+            notifications={notifications}
+            onMarkRead={markAllRead}
+          />
+        </div>
+        <div className={screen === 'inbox' ? 'block' : 'hidden'}>
+          <Inbox isActive={screen === 'inbox'} onBack={() => setScreen('home')} onOpenConversation={openConversation} onMarkRead={markAllRead} />
+        </div>
+        <div className={screen === 'mylistings' ? 'block' : 'hidden'}>
+          <MyListings
+            isActive={screen === 'mylistings'}
+            onOpenBook={openBook}
+            onEditBook={(book) => { setEditingBook(book); goTo('edit') }}
+          />
+        </div>
+        <div className={screen === 'profile' ? 'block' : 'hidden'}>
+          <Profile isActive={screen === 'profile'} onBack={() => setScreen('home')} onOpenBook={openBook} onEditBook={(book) => { setEditingBook(book); goTo('edit') }} />
+        </div>
+
+        {NAV_SCREENS.includes(screen) && (
+          <>
+            <BottomNav active={navTab} onNavigate={handleNavigation} unreadCount={unreadCount} />
+            <InstallPrompt />
+          </>
+        )}
+      </div>
+    </Suspense>
   )
 }
 
 function App() {
-  return (
-    <AuthProvider>
-      <Suspense fallback={<Splash />}>
-        <AppContent />
-      </Suspense>
-    </AuthProvider>
-  )
+  return <AuthProvider><AppContent /></AuthProvider>
 }
 
 export default App
