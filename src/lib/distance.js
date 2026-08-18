@@ -1,6 +1,8 @@
 // Haversine formula — returns distance in km between two lat/lng points
 export function getDistanceKm(lat1, lng1, lat2, lng2) {
-  const R = 6371 // Earth radius in km
+  if (!lat1 || !lng1 || !lat2 || !lng2) return null
+
+  const R = 6371
   const dLat = toRad(lat2 - lat1)
   const dLng = toRad(lng2 - lng1)
   const a =
@@ -16,9 +18,16 @@ function toRad(deg) { return deg * (Math.PI / 180) }
 // Filter books by distance from user's location
 export function filterByDistance(books, userLat, userLng, radiusKm) {
   if (!userLat || !userLng || !radiusKm) return books
+
   return books.filter((book) => {
-    if (!book.lat || !book.lng) return true // no location on book — show anyway
-    const dist = getDistanceKm(userLat, userLng, book.lat, book.lng)
+    // If book has no location, always show it (don't hide locationless books)
+    if (!book.lat || !book.lng) return true
+
+    const dist = getDistanceKm(
+      Number(userLat), Number(userLng),
+      Number(book.lat), Number(book.lng)
+    )
+    if (dist === null) return true
     return dist <= radiusKm
   })
 }

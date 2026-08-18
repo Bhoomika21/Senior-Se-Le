@@ -11,7 +11,7 @@ const VIDEO_REQUIRED_THRESHOLD = 300
 const MAX_VIDEO_MB = 50
 
 export default function PostBook({ editBook = null, onBack, onPosted }) {
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
   const isEditMode = !!editBook
 
   const [existingImages, setExistingImages] = useState(editBook?.images || [])
@@ -40,7 +40,10 @@ export default function PostBook({ editBook = null, onBack, onPosted }) {
     const file = e.target.files[0]
     if (!file) return
     setVideoError('')
-    if (file.size > MAX_VIDEO_MB * 1024 * 1024) { setVideoError(`Video must be under ${MAX_VIDEO_MB}MB`); return }
+    if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
+      setVideoError(`Video must be under ${MAX_VIDEO_MB}MB`)
+      return
+    }
     setExistingVideoUrl(null)
     setNewVideo({ file, preview: URL.createObjectURL(file) })
   }
@@ -49,7 +52,7 @@ export default function PostBook({ editBook = null, onBack, onPosted }) {
     const remainingSlots = 4 - totalImageCount
     const files = Array.from(e.target.files).slice(0, remainingSlots)
     const withPreviews = files.map((file) => ({ file, preview: URL.createObjectURL(file) }))
-    setNewImages((prev) => [...prev, ...withPreviews].slice(0, remainingSlots + prev.length))
+    setNewImages((prev) => [...prev, ...withPreviews])
   }
 
   async function handleSubmit(e) {
@@ -63,50 +66,75 @@ export default function PostBook({ editBook = null, onBack, onPosted }) {
       setError('Your selling price must be less than the original price')
       return
     }
-    if (videoRequired && !hasVideo) { setError(`Books priced ₹${VIDEO_REQUIRED_THRESHOLD}+ require a verification video`); return }
+    if (videoRequired && !hasVideo) {
+      setError(`Books priced ₹${VIDEO_REQUIRED_THRESHOLD}+ require a verification video`)
+      return
+    }
 
     setLoading(true)
     try {
+      // Fetch latest profile directly from DB to get current location
+      // (don't rely on profile state which may be stale)
+      const { data: latestProfile } = await supabase
+        .from('profiles')
+        .select('city, lat, lng')
+        .eq('id', user.id)
+        .single()
+
       // Upload new images
       const uploadedUrls = []
       for (const img of newImages) {
         const fileExt = img.file.name.split('.').pop()
         const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`
-        const { error: uploadError } = await supabase.storage.from('book-images').upload(fileName, img.file)
+        const { error: uploadError } = await supabase.storage
+          .from('book-images')
+          .upload(fileName, img.file)
         if (uploadError) throw uploadError
         const { data: urlData } = supabase.storage.from('book-images').getPublicUrl(fileName)
         uploadedUrls.push(urlData.publicUrl)
       }
       const finalImages = [...existingImages, ...uploadedUrls]
 
-      // Upload video if new one selected
+      // Upload video if new
       let finalVideoUrl = existingVideoUrl
       if (newVideo) {
         const fileExt = newVideo.file.name.split('.').pop()
         const fileName = `${user.id}/${Date.now()}-vid.${fileExt}`
-        const { error: videoUploadError } = await supabase.storage.from('book-images').upload(fileName, newVideo.file)
+        const { error: videoUploadError } = await supabase.storage
+          .from('book-images')
+          .upload(fileName, newVideo.file)
         if (videoUploadError) throw videoUploadError
         const { data: videoUrlData } = supabase.storage.from('book-images').getPublicUrl(fileName)
         finalVideoUrl = videoUrlData.publicUrl
       }
 
       const payload = {
-        title, author, subject, category, description, condition,
+        title,
+        author,
+        subject,
+        category,
+        description,
+        condition,
         price: Number(price),
         original_price: originalPrice ? Number(originalPrice) : null,
         images: finalImages,
         video_url: finalVideoUrl,
-        // Inherit seller's location from profile
-        city: profile?.city || null,
-        lat: profile?.lat || null,
-        lng: profile?.lng || null,
+        // Use freshly fetched profile location — not stale state
+        city: latestProfile?.city || null,
+        lat: latestProfile?.lat ? Number(latestProfile.lat) : null,
+        lng: latestProfile?.lng ? Number(latestProfile.lng) : null,
       }
 
       if (isEditMode) {
-        const { error: updateError } = await supabase.from('books').update(payload).eq('id', editBook.id)
+        const { error: updateError } = await supabase
+          .from('books')
+          .update(payload)
+          .eq('id', editBook.id)
         if (updateError) throw updateError
       } else {
-        const { error: insertError } = await supabase.from('books').insert({ seller_id: user.id, ...payload })
+        const { error: insertError } = await supabase
+          .from('books')
+          .insert({ seller_id: user.id, ...payload })
         if (insertError) throw insertError
       }
 
@@ -122,7 +150,9 @@ export default function PostBook({ editBook = null, onBack, onPosted }) {
     <div className="min-h-screen bg-cream pb-28">
       <div className="bg-navy px-4 pt-5 pb-4 flex items-center gap-3 sticky top-0 z-20">
         <button onClick={onBack} className="text-white"><ChevronLeft size={22} /></button>
-        <h1 className="font-display font-bold text-white text-base">{isEditMode ? 'Edit Listing' : 'Post a Book'}</h1>
+        <h1 className="font-display font-bold text-white text-base">
+          {isEditMode ? 'Edit Listing' : 'Post a Book'}
+        </h1>
       </div>
 
       <form onSubmit={handleSubmit} className="px-4 pt-5 flex flex-col gap-5">
@@ -282,7 +312,9 @@ export default function PostBook({ editBook = null, onBack, onPosted }) {
 
       <div className="fixed bottom-0 left-0 right-0 bg-cream/95 backdrop-blur border-t border-border px-4 py-4">
         <Button variant="primary" size="lg" className="w-full" onClick={handleSubmit} disabled={loading}>
-          {loading ? (isEditMode ? 'Saving…' : 'Posting…') : (isEditMode ? 'Save Changes' : 'Post Book for Sale')}
+          {loading
+            ? (isEditMode ? 'Saving…' : 'Posting…')
+            : (isEditMode ? 'Save Changes' : 'Post Book for Sale')}
         </Button>
       </div>
     </div>
