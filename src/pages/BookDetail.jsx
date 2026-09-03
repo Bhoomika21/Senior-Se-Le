@@ -16,6 +16,9 @@ export default function BookDetail({ book, onBack, onChat, onReport, onEdit, onR
   const media = [...(book.images || []), ...(book.video_url ? [{ video: book.video_url }] : [])]
   const platformFee = Math.max(8, Math.round(Number(book.price) * 0.02))
 
+  // Use book's own city first, fall back to seller profile city
+  const displayCity = book.city || book.profiles?.city || null
+
   async function handleRemove() {
     if (!confirm('Remove this listing? This cannot be undone.')) return
     setRemoving(true)
@@ -26,7 +29,7 @@ export default function BookDetail({ book, onBack, onChat, onReport, onEdit, onR
 
   function handleShare() {
     const conditionLabel = ['', 'Heavily Used', 'Worn', 'Fair', 'Good', 'Like New'][book.condition]
-    const text = `📚 *${book.title}* for ₹${book.price}\nCondition: ${conditionLabel}${book.profiles?.city ? `\n📍 ${book.profiles.city}` : ''}\n\nCheck it out on Senior Se Le 👇\nhttps://senior-se-le-one.vercel.app`
+    const text = `📚 *${book.title}* for ₹${book.price}\nCondition: ${conditionLabel}${displayCity ? `\n📍 ${displayCity}` : ''}\n\nCheck it out on Senior Se Le 👇\nhttps://seniorsele.com`
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
   }
 
@@ -102,6 +105,17 @@ export default function BookDetail({ book, onBack, onChat, onReport, onEdit, onR
           )}
         </div>
 
+        {/* Book location — shown prominently */}
+        {displayCity && (
+          <div className="flex items-center gap-2 bg-orange/5 rounded-button px-3.5 py-2.5">
+            <MapPin size={14} className="text-orange shrink-0" />
+            <div>
+              <span className="text-sm font-semibold text-navy">{displayCity}</span>
+              <span className="text-xs text-muted ml-2">— pickup location</span>
+            </div>
+          </div>
+        )}
+
         {book.description && (
           <div>
             <h3 className="font-display font-semibold text-sm text-navy mb-1.5">Description</h3>
@@ -114,7 +128,7 @@ export default function BookDetail({ book, onBack, onChat, onReport, onEdit, onR
           {book.subject && <span className="text-xs font-semibold text-navy bg-white border border-border px-3 py-1.5 rounded-chip">{book.subject}</span>}
         </div>
 
-        {/* Seller card — shows city prominently */}
+        {/* Seller card */}
         <div className="bg-white rounded-card border border-border p-4 flex items-center gap-3">
           <div className="w-11 h-11 rounded-full bg-navy/10 flex items-center justify-center font-display font-bold text-navy text-sm shrink-0">
             {book.profiles?.full_name?.[0]?.toUpperCase() || '?'}
@@ -124,12 +138,6 @@ export default function BookDetail({ book, onBack, onChat, onReport, onEdit, onR
               {isOwner ? 'You' : book.profiles?.full_name || 'Seller'}
             </p>
             <p className="text-xs text-muted truncate">{book.profiles?.college || 'College not set'}</p>
-            {book.profiles?.city && (
-              <div className="flex items-center gap-1 mt-1">
-                <MapPin size={10} className="text-orange shrink-0" />
-                <span className="text-xs text-orange font-medium">{book.profiles.city}</span>
-              </div>
-            )}
           </div>
           {book.profiles?.rating_avg > 0 && (
             <div className="flex items-center gap-1 shrink-0">

@@ -1,10 +1,11 @@
-import { useState } from 'react'
-import { ChevronLeft, Camera, X, Video, ShieldCheck } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ChevronLeft, Camera, X, Video, ShieldCheck, MapPin, Loader, CheckCircle, AlertCircle } from 'lucide-react'
 import Button from '../components/Button'
 import Input from '../components/Input'
 import { CONDITIONS } from '../components/ConditionBadge'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { pinToLatLng } from '../lib/pincode'
 
 const CATEGORIES = ['Engineering', 'Commerce', 'Science', 'Medical', 'Arts', 'Other']
 const VIDEO_REQUIRED_THRESHOLD = 300
@@ -28,8 +29,57 @@ export default function PostBook({ editBook = null, onBack, onPosted }) {
   const [description, setDescription] = useState(editBook?.description || '')
   const [price, setPrice] = useState(editBook?.price?.toString() || '')
   const [originalPrice, setOriginalPrice] = useState(editBook?.original_price?.toString() || '')
+
+  // Per-book location — editable, independent from profile
+  const [city, setCity] = useState(editBook?.city || '')
+  const [pinCode, setPinCode] = useState('')
+  const [pinLoading, setPinLoading] = useState(false)
+  const [pinResolved, setPinResolved] = useState(
+    editBook?.lat ? { lat: Number(editBook.lat), lng: Number(editBook.lng), display: editBook.city } : null
+  )
+  const [pinError, setPinError] = useState('')
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Pre-fill city from profile when creating a new book
+  useEffect(() => {
+    if (!isEditMode) {
+      supabase
+        .from('profiles')
+        .select('city, lat, lng')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data?.city) setCity(data.city)
+          if (data?.lat && data?.lng) {
+            setPinResolved({
+              lat: Number(data.lat),
+              lng: Number(data.lng),
+              display: data.city,
+            })
+          }
+        })
+    }
+  }, [])
+
+  async function handlePinChange(val) {
+    const cleaned = val.replace(/\D/g, '').slice(0, 6)
+    setPinCode(cleaned)
+    setPinError('')
+    setPinResolved(null)
+    if (cleaned.length === 6) {
+      setPinLoading(true)
+      const result = await pinToLatLng(cleaned)
+      setPinLoading(false)
+      if (result) {
+        setPinResolved(result)
+        setCity(result.district)
+      } else {
+        setPinError('Invalid PIN code. Please check and try again.')
+      }
+    }
+  }
 
   const totalImageCount = existingImages.length + newImages.length
   const hasVideo = !!(existingVideoUrl || newVideo)
@@ -40,10 +90,7 @@ export default function PostBook({ editBook = null, onBack, onPosted }) {
     const file = e.target.files[0]
     if (!file) return
     setVideoError('')
-    if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
-      setVideoError(`Video must be under ${MAX_VIDEO_MB}MB`)
-      return
-    }
+    if (file.size > MAX_VIDEO_MB * 1024 * 1024) { setVideoError(`Video must be under ${MAX_VIDEO_MB}MB`); return }
     setExistingVideoUrl(null)
     setNewVideo({ file, preview: URL.createObjectURL(file) })
   }
@@ -58,86 +105,57 @@ export default function PostBook({ editBook = null, onBack, onPosted }) {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
-
     if (totalImageCount === 0) { setError('Add at least one photo of the book'); return }
     if (!title || !price) { setError('Title and price are required'); return }
     if (Number(price) <= 0) { setError('Price must be greater than ₹0'); return }
     if (originalPrice && Number(price) >= Number(originalPrice)) {
-      setError('Your selling price must be less than the original price')
-      return
+      setError('Your selling price must be less than the original price'); return
     }
     if (videoRequired && !hasVideo) {
-      setError(`Books priced ₹${VIDEO_REQUIRED_THRESHOLD}+ require a verification video`)
-      return
+      setError(`Books priced ₹${VIDEO_REQUIRED_THRESHOLD}+ require a verification video`); return
     }
 
     setLoading(true)
     try {
-      // Fetch latest profile directly from DB to get current location
-      // (don't rely on profile state which may be stale)
-      const { data: latestProfile } = await supabase
-        .from('profiles')
-        .select('city, lat, lng')
-        .eq('id', user.id)
-        .single()
-
-      // Upload new images
       const uploadedUrls = []
       for (const img of newImages) {
         const fileExt = img.file.name.split('.').pop()
         const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`
-        const { error: uploadError } = await supabase.storage
-          .from('book-images')
-          .upload(fileName, img.file)
+        const { error: uploadError } = await supabase.storage.from('book-images').upload(fileName, img.file)
         if (uploadError) throw uploadError
         const { data: urlData } = supabase.storage.from('book-images').getPublicUrl(fileName)
         uploadedUrls.push(urlData.publicUrl)
       }
       const finalImages = [...existingImages, ...uploadedUrls]
 
-      // Upload video if new
       let finalVideoUrl = existingVideoUrl
       if (newVideo) {
         const fileExt = newVideo.file.name.split('.').pop()
         const fileName = `${user.id}/${Date.now()}-vid.${fileExt}`
-        const { error: videoUploadError } = await supabase.storage
-          .from('book-images')
-          .upload(fileName, newVideo.file)
-        if (videoUploadError) throw videoUploadError
-        const { data: videoUrlData } = supabase.storage.from('book-images').getPublicUrl(fileName)
-        finalVideoUrl = videoUrlData.publicUrl
+        const { error: ve } = await supabase.storage.from('book-images').upload(fileName, newVideo.file)
+        if (ve) throw ve
+        const { data: vUrl } = supabase.storage.from('book-images').getPublicUrl(fileName)
+        finalVideoUrl = vUrl.publicUrl
       }
 
       const payload = {
-        title,
-        author,
-        subject,
-        category,
-        description,
-        condition,
+        title, author, subject, category, description, condition,
         price: Number(price),
         original_price: originalPrice ? Number(originalPrice) : null,
         images: finalImages,
         video_url: finalVideoUrl,
-        // Use freshly fetched profile location — not stale state
-        city: latestProfile?.city || null,
-        lat: latestProfile?.lat ? Number(latestProfile.lat) : null,
-        lng: latestProfile?.lng ? Number(latestProfile.lng) : null,
+        city: city.trim() || null,
+        lat: pinResolved?.lat || null,
+        lng: pinResolved?.lng || null,
       }
 
       if (isEditMode) {
-        const { error: updateError } = await supabase
-          .from('books')
-          .update(payload)
-          .eq('id', editBook.id)
-        if (updateError) throw updateError
+        const { error: ue } = await supabase.from('books').update(payload).eq('id', editBook.id)
+        if (ue) throw ue
       } else {
-        const { error: insertError } = await supabase
-          .from('books')
-          .insert({ seller_id: user.id, ...payload })
-        if (insertError) throw insertError
+        const { error: ie } = await supabase.from('books').insert({ seller_id: user.id, ...payload })
+        if (ie) throw ie
       }
-
       onPosted?.()
     } catch (err) {
       setError(err.message || 'Something went wrong. Try again.')
@@ -156,6 +174,7 @@ export default function PostBook({ editBook = null, onBack, onPosted }) {
       </div>
 
       <form onSubmit={handleSubmit} className="px-4 pt-5 flex flex-col gap-5">
+
         {/* Photo upload */}
         <div>
           <label className="block text-xs font-semibold text-navy mb-2 font-display">
@@ -283,6 +302,51 @@ export default function PostBook({ editBook = null, onBack, onPosted }) {
             onChange={(e) => setOriginalPrice(e.target.value)}
             error={originalPrice && price && Number(price) >= Number(originalPrice) ? 'Must be higher than selling price' : ''}
           />
+        </div>
+
+        {/* Location — per book, editable */}
+        <div className="bg-white rounded-card border border-border p-4 flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <MapPin size={14} className="text-orange shrink-0" />
+            <p className="font-display font-semibold text-sm text-navy">Book Location</p>
+            <span className="text-[10px] text-muted font-normal">— where the buyer can collect</span>
+          </div>
+
+          <Input
+            label="City / Area"
+            type="text"
+            placeholder="e.g. Surat, Ahmedabad"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+          />
+
+          <div>
+            <label className="block text-xs font-semibold text-navy mb-1.5 font-display">
+              PIN Code <span className="text-muted font-normal">(optional — for distance filter)</span>
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder={pinResolved ? 'Enter new PIN to change' : 'e.g. 395001'}
+                value={pinCode}
+                onChange={(e) => handlePinChange(e.target.value)}
+                maxLength={6}
+                className={`w-full bg-cream border rounded-button px-4 py-3 text-sm text-navy outline-none transition-colors pr-10 ${
+                  pinError ? 'border-danger' : pinResolved ? 'border-success' : 'border-border focus:border-orange'
+                }`}
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                {pinLoading && <Loader size={16} className="text-muted animate-spin" />}
+                {!pinLoading && pinResolved && <CheckCircle size={16} className="text-success" />}
+                {!pinLoading && pinError && <AlertCircle size={16} className="text-danger" />}
+              </div>
+            </div>
+            {pinError && <p className="text-xs text-danger mt-1">{pinError}</p>}
+            {pinResolved && (
+              <p className="text-[11px] text-success mt-1">✓ {pinResolved.display}</p>
+            )}
+          </div>
         </div>
 
         {/* Fee breakdown */}
