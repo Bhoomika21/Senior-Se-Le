@@ -8,6 +8,7 @@ import Onboarding from './pages/Onboarding'
 import Home from './pages/Home'
 import BottomNav from './components/BottomNav'
 import InstallPrompt from './components/InstallPrompt'
+import { Analytics } from "@vercel/analytics/next"
 
 const PostBook = lazy(() => import('./pages/PostBook'))
 const BookDetail = lazy(() => import('./pages/BookDetail'))
