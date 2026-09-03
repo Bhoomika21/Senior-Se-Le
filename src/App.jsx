@@ -8,7 +8,7 @@ import Onboarding from './pages/Onboarding'
 import Home from './pages/Home'
 import BottomNav from './components/BottomNav'
 import InstallPrompt from './components/InstallPrompt'
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from "@vercel/analytics/react"
 
 const PostBook = lazy(() => import('./pages/PostBook'))
 const BookDetail = lazy(() => import('./pages/BookDetail'))
@@ -154,7 +154,12 @@ function AppContent() {
 }
 
 function App() {
-  return <AuthProvider><AppContent /></AuthProvider>
+  return (
+    <AuthProvider>
+      <AppContent />
+      <Analytics />
+    </AuthProvider>
+  )
 }
 
 export default App
